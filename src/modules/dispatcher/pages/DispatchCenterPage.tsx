@@ -23,6 +23,7 @@ interface BatchDelivery {
 }
 
 interface Batch {
+  id: number;
   batch_code: string;
   driver_id: number;
   driver_name: string;
@@ -113,6 +114,24 @@ export const DispatchCenterPage: React.FC = () => {
     load();
   }, []);
 
+  // ── Delete batch ─────────────────────────────────────────────────────────
+  const handleDeleteBatch = async (batchId: number) => {
+    if (!window.confirm('Delete this batch? This will remove all associated deliveries.')) return;
+    try {
+      const r = await fetchWithAuth(`/api/dispatcher/batch/${batchId}`, {
+        method: 'DELETE',
+      });
+      if (r.ok) {
+        setBatches(prev => prev.filter(b => b.id !== batchId));
+        if (expandedBatch === batches.find(b => b.id === batchId)?.batch_code) {
+          setExpandedBatch(null);
+        }
+      }
+    } catch {
+      alert('Failed to delete batch');
+    }
+  };
+
   // ── WebSocket live updates ─────────────────────────────────────────────
   useEffect(() => {
     if (!token) return;
@@ -132,6 +151,7 @@ export const DispatchCenterPage: React.FC = () => {
             if (exists) return prev;
             const driverName = drivers.find(d => d.id === msg.driver_id)?.name ?? `Driver #${msg.driver_id}`;
             return [{
+              id: msg.id,
               batch_code: msg.batch_code,
               driver_id: msg.driver_id,
               driver_name: driverName,
@@ -304,9 +324,9 @@ export const DispatchCenterPage: React.FC = () => {
                 style={{ borderColor: '#e2e8f0' }}
               >
                 <option value="">-- Choose a driver --</option>
-                {drivers.filter(d => d.is_active).map(d => (
+                {drivers.map(d => (
                   <option key={d.id} value={d.id}>
-                    {d.name} — Today: {d.today_assigned} assigned / {d.today_completed} done
+                    {d.name} {!d.is_active && '(Offline)'} — Today: {d.today_assigned} assigned / {d.today_completed} done
                   </option>
                 ))}
               </select>
@@ -509,6 +529,18 @@ export const DispatchCenterPage: React.FC = () => {
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteBatch(batch.id);
+                            }}
+                            className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-md transition-all mr-2"
+                            title="Delete Batch"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
                           <span className="text-xl font-black" style={{ color: pct === 100 ? '#10b981' : '#3b82f6' }}>{pct}%</span>
                           <svg
                             className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
